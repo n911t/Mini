@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>لعبة تركيب الصور</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --grid-size: 3;
+            --board-size: 400px;
+            --bg: #1a1a2e;
+            --primary: #e94560;
+            --secondary: #0f3460;
+            --accent: #16c79a;
+            --yellow: #f5c518;
+            --text: #eee;
+            --pixel: 4px;
+        }
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background-color: var(--bg);
+            background-image:
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            color: var(--text);
+            padding: 10px;
+            overflow-x: hidden;
+        }
+        h1 {
+            font-size: 16px;
+            color: var(--yellow);
+            text-shadow: 3px 3px 0 var(--primary), 6px 6px 0 rgba(0,0,0,0.3);
+            margin: 10px 0 8px;
+            text-align: center;
+            line-height: 1.6;
+            image-rendering: pixelated;
+        }
+        .instructions {
+            font-size: 7px;
+            color: var(--accent);
+            margin-bottom: 12px;
+            background: var(--secondary);
+            padding: 8px 12px;
+            border: 2px solid var(--accent);
+            border-image: none;
+            text-align: center;
+            line-height: 1.8;
+            max-width: 95vw;
+        }
+        .controls {
+            background: var(--secondary);
+            padding: 12px 15px;
+            border: 3px solid var(--primary);
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 95vw;
+            width: 100%;
+        }
+        label { font-size: 8px; color: var(--yellow); }
+        select, input[type="file"] {
+            padding: 8px 10px;
+            border: 2px solid var(--accent);
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .btn-row { display: flex; gap: 8px; width: 100%; justify-content: center; flex-wrap: wrap; }
+        button {
+            padding: 8px 12px;
+            border: 3px solid;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            cursor: pointer;
+            text-transform: uppercase;
+            image-rendering: pixelated;
+            transition: transform 0.1s;
+            position: relative;
+            min-width: 80px;
+        }
+        button:active { transform: scale(0.95); }
+        #start-btn { background: var(--primary); color: #fff; border-color: #c0392b; }
+        #start-btn:hover { background: #ff6b81; }
+        #peek-btn { background: #e67e22; color: #fff; border-color: #d35400; }
+        #peek-btn:hover { background: #f39c12; }
+        button:disabled { background: #555; color: #999; border-color: #444; cursor: not-allowed; opacity: 0.6; }
+        .stats-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            justify-content: center;
+        }
+        #move-counter, #timer-display {
+            font-size: 8px;
+            color: var(--yellow);
+            background: var(--bg);
+            border: 2px solid var(--yellow);
+            padding: 8px 12px;
+            flex: 1;
+            text-align: center;
+        }
+        #puzzle-container {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+        }
+        #board {
+            direction: ltr;
+            width: var(--board-size);
+            height: var(--board-size);
+            max-width: 94vw;
+            max-height: 94vw;
+            display: grid;
+            grid-template-columns: repeat(var(--grid-size), 1fr);
+            grid-template-rows: repeat(var(--grid-size), 1fr);
+            gap: 2px;
+            background-color: #111;
+            border: 4px solid var(--accent);
+            box-shadow: 0 0 0 4px var(--bg), 0 0 20px var(--accent);
+            overflow: hidden;
+        }
+        .tile {
+            background-repeat: no-repeat;
+            cursor: pointer;
+            box-sizing: border-box;
+            position: relative;
+            transition: transform 0.1s;
+        }
+        .tile:hover { filter: brightness(1.15); }
+        .tile:active { transform: scale(0.96); }
+        .tile.selected {
+            outline: 3px solid var(--primary);
+            outline-offset: -3px;
+            z-index: 10;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        #preview-overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 50%; transform: translateX(-50%);
+            width: var(--board-size);
+            max-width: 94vw;
+            height: 0;
+            padding-bottom: var(--board-size);
+            max-height: 94vw;
+            z-index: 50;
+            background: rgba(0,0,0,0.9);
+            border: 4px solid var(--accent);
+            box-shadow: 0 0 20px var(--accent);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        #preview-overlay p { color: var(--accent); font-size: 8px; margin-bottom: 6px; position: absolute; top: 8px; z-index: 2; }
+        #preview-overlay img {
+            max-width: 92%;
+            max-height: 80%;
+            border: 3px solid var(--yellow);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        #peek-countdown {
+            font-size: 14px;
+            font-weight: bold;
+            color: var(--primary);
+            position: absolute;
+            bottom: 10px;
+            z-index: 2;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+        .modal-content {
+            background: var(--secondary);
+            border: 4px solid var(--yellow);
+            padding: 25px 20px;
+            text-align: center;
+            box-shadow: 0 0 30px var(--yellow), 8px 8px 0 var(--primary);
+            max-width: 90vw;
+            width: 320px;
+            animation: popIn 0.3s ease;
+        }
+        @keyframes popIn { 0% { transform: scale(0.3) rotate(-5deg); opacity: 0; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+        .modal-content h2 { color: var(--yellow); font-size: 14px; margin-bottom: 12px; text-shadow: 2px 2px 0 var(--primary); }
+        .modal-content p { font-size: 8px; color: var(--text); margin-bottom: 15px; line-height: 1.8; }
+        .stats-box {
+            border: 2px dashed var(--accent);
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+        .stats-box div {
+            font-size: 8px;
+            color: var(--accent);
+            margin: 8px 0;
+            display: flex;
+            justify-content: space-between;
+        }
+        .close-btn {
+            background: var(--accent);
+            color: var(--bg);
+            font-size: 8px;
+            padding: 10px 20px;
+            width: 100%;
+            border: 3px solid #12a883;
+            cursor: pointer;
+            font-family: 'Press Start 2P', monospace;
+        }
+        .close-btn:hover { background: #1ee0b0; }
+
+        @media (max-width: 400px) {
+            h1 { font-size: 13px; }
+            .instructions { font-size: 7px; padding: 8px 10px; }
+            .controls { padding: 12px; gap: 10px; }
+            label { font-size: 7px; }
+            select, input[type="file"] { font-size: 7px; padding: 7px; }
+            button { font-size: 7px; padding: 9px 14px; min-width: 70px; }
+            #move-counter, #timer-display { font-size: 7px; padding: 7px 8px; }
+            .modal-content { padding: 22px 18px; }
+            .modal-content h2 { font-size: 13px; }
+            .modal-content p { font-size: 8px; }
+            .stats-box div { font-size: 8px; }
+            .close-btn { font-size: 8px; padding: 12px; }
+        }
+        @media (max-width: 320px) {
+            h1 { font-size: 11px; }
+            .instructions { font-size: 6px; }
+            button { font-size: 6px; padding: 8px 10px; min-width: 60px; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>لعبة تركيب الصور</h1>
+    <div class="instructions">رتب بين القطع لتحصل على الصورة كاملة</div>
+
+    <div class="controls">
+        <div style="width:100%">
+            <label for="image-input">اختر صورة</label>
+            <input type="file" id="image-input" accept="image/*">
+        </div>
+        <div style="width:100%">
+            <label for="difficulty">الصعوبة</label>
+            <select id="difficulty">
+                <option value="3">سهل (3x3)</option>
+                <option value="4">متوسط (4x4)</option>
+                <option value="5">صعب (5x5)</option>
+                <option value="6">محترف (6x6)</option>
+                <option value="7">خبير (7x7)</option>
+                <option value="8">اسطوري (8x8)</option>
+            </select>
+        </div>
+        <div class="btn-row">
+            <button id="start-btn" disabled>ابدأ</button>
+            <button id="peek-btn" disabled>مشاهدة</button>
+        </div>
+        <div class="stats-row">
+            <span id="move-counter">حركات: 0</span>
+            <span id="timer-display">وقت: 00:00</span>
+        </div>
+    </div>
+
+    <div id="puzzle-container">
+        <div id="preview-overlay">
+            <p>الصورة الاصلية</p>
+            <img id="preview-img" src="" alt="preview">
+            <span id="peek-countdown"></span>
+        </div>
+        <div id="board"></div>
+    </div>
+
+    <div id="win-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>! كفو عليك</h2>
+            <p>ركبت الصورة بنجاح</p>
+            <div class="stats-box">
+                <div><span>الوقت</span> <span id="final-time">00:00</span></div>
+                <div><span>الحركات</span> <span id="final-moves">0</span></div>
+            </div>
+            <button class="close-btn" id="close-modal">اغلاق</button>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        var imageInput = document.getElementById('image-input');
+        var difficultySelect = document.getElementById('difficulty');
+        var startBtn = document.getElementById('start-btn');
+        var peekBtn = document.getElementById('peek-btn');
+        var board = document.getElementById('board');
+        var puzzleContainer = document.getElementById('puzzle-container');
+        var previewOverlay = document.getElementById('preview-overlay');
+        var previewImg = document.getElementById('preview-img');
+        var peekCountdown = document.getElementById('peek-countdown');
+        var moveCounter = document.getElementById('move-counter');
+        var timerDisplay = document.getElementById('timer-display');
+        var winModal = document.getElementById('win-modal');
+        var finalTimeEl = document.getElementById('final-time');
+        var finalMovesEl = document.getElementById('final-moves');
+        var closeModalBtn = document.getElementById('close-modal');
+
+        var imageUrl = '';
+        var gridSize = 3;
+        var selectedTile = null;
+        var moves = 0;
+        var timerInterval = null;
+        var peekTimerInterval = null;
+        var seconds = 0;
+        var gameActive = false;
+        var peekCount = 0;
+        var peekMax = 1;
+
+        imageInput.addEventListener('change', function(e) {
+            var file = e.target.files[0];
+            if (file) {
+                var reader = new FileReader();
+                reader.onload = function(event) {
+                    imageUrl = event.target.result;
+                    previewImg.src = imageUrl;
+                    startBtn.disabled = false;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function formatTime(sec) {
+            var m = Math.floor(sec / 60);
+            var s = sec % 60;
+            return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        function startTimer() {
+            seconds = 0;
+            timerDisplay.textContent = 'وقت: 00:00';
+            clearInterval(timerInterval);
+            timerInterval = setInterval(function() {
+                seconds++;
+                timerDisplay.textContent = 'وقت: ' + formatTime(seconds);
+            }, 1000);
+        }
+
+        function stopTimer() { clearInterval(timerInterval); }
+
+        startBtn.addEventListener('click', function() {
+            gridSize = parseInt(difficultySelect.value);
+            document.documentElement.style.setProperty('--grid-size', gridSize);
+            if (gridSize <= 4) { peekMax = 0; } else if (gridSize <= 6) { peekMax = 1; } else { peekMax = 2; }
+            winModal.style.display = 'none';
+            selectedTile = null;
+            moves = 0;
+            moveCounter.textContent = 'حركات: 0';
+            gameActive = true;
+            previewOverlay.style.display = 'none';
+            clearInterval(peekTimerInterval);
+            peekCount = 0;
+            if (peekMax > 0) {
+                peekBtn.disabled = false;
+                peekBtn.textContent = 'مشاهدة (' + peekMax + ')';
+            } else {
+                peekBtn.disabled = true;
+                peekBtn.textContent = 'مشاهدة';
+            }
+            buildPuzzle();
+            puzzleContainer.style.display = 'flex';
+            startTimer();
+        });
+
+        difficultySelect.addEventListener('change', function() {
+            if (imageUrl && puzzleContainer.style.display !== 'none') {
+                startBtn.click();
+            }
+        });
+
+        peekBtn.addEventListener('click', function() {
+            if (peekCount >= peekMax) return;
+            peekCount++;
+            previewOverlay.style.display = 'flex';
+            if (peekCount >= peekMax) {
+                peekBtn.disabled = true;
+                peekBtn.textContent = 'انتهت';
+            } else {
+                peekBtn.textContent = 'مشاهدة (' + (peekMax - peekCount) + ')';
+            }
+            var countdown = 5;
+            peekCountdown.textContent = countdown;
+            clearInterval(peekTimerInterval);
+            peekTimerInterval = setInterval(function() {
+                countdown--;
+                if (countdown <= 0) {
+                    clearInterval(peekTimerInterval);
+                    previewOverlay.style.display = 'none';
+                    peekCountdown.textContent = '';
+                } else {
+                    peekCountdown.textContent = countdown;
+                }
+            }, 1000);
+        });
+
+        function getPos(index) {
+            var r = Math.floor(index / gridSize);
+            var c = index % gridSize;
+            var x = gridSize === 1 ? 0 : (c / (gridSize - 1)) * 100;
+            var y = gridSize === 1 ? 0 : (r / (gridSize - 1)) * 100;
+            return x + '% ' + y + '%';
+        }
+
+        function renderTile(tile) {
+            var p = parseInt(tile.getAttribute('data-piece'), 10);
+            tile.style.backgroundImage = 'url(' + imageUrl + ')';
+            tile.style.backgroundPosition = getPos(p);
+            tile.style.backgroundSize = (gridSize * 100) + '% ' + (gridSize * 100) + '%';
+        }
+
+        function buildPuzzle() {
+            board.innerHTML = '';
+            var total = gridSize * gridSize;
+
+            for (var i = 0; i < total; i++) {
+                var tile = document.createElement('div');
+                tile.className = 'tile';
+                tile.setAttribute('data-piece', i);
+                tile.setAttribute('data-id', i);
+                board.appendChild(tile);
+                renderTile(tile);
+            }
+
+            var allTiles = board.querySelectorAll('.tile');
+            var arr = [];
+            for (var i = 0; i < allTiles.length; i++) arr.push(allTiles[i]);
+
+            var nums = [];
+            for (var i = 0; i < arr.length; i++) nums.push(i);
+
+            for (var i = nums.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var tmp = nums[i]; nums[i] = nums[j]; nums[j] = tmp;
+            }
+
+            var same = true;
+            for (var i = 0; i < nums.length; i++) { if (nums[i] !== i) { same = false; break; } }
+            if (same) { var tmp = nums[0]; nums[0] = nums[1]; nums[1] = tmp; }
+
+            for (var i = 0; i < arr.length; i++) {
+                arr[i].setAttribute('data-piece', nums[i]);
+                renderTile(arr[i]);
+            }
+
+            for (var i = 0; i < arr.length; i++) {
+                arr[i].onclick = function() {
+                    if (!gameActive) return;
+                    if (!selectedTile) {
+                        selectedTile = this;
+                        this.style.outline = '3px solid #e94560';
+                        this.style.outlineOffset = '-3px';
+                        this.style.boxShadow = '0 0 10px #e94560';
+                    } else {
+                        if (selectedTile === this) {
+                            selectedTile.style.outline = '';
+                            selectedTile.style.boxShadow = '';
+                            selectedTile = null;
+                            return;
+                        }
+                        var a = selectedTile.getAttribute('data-piece');
+                        var b = this.getAttribute('data-piece');
+                        selectedTile.setAttribute('data-piece', b);
+                        this.setAttribute('data-piece', a);
+                        renderTile(selectedTile);
+                        renderTile(this);
+                        selectedTile.style.outline = '';
+                        selectedTile.style.boxShadow = '';
+                        selectedTile = null;
+                        moves++;
+                        moveCounter.textContent = 'حركات: ' + moves;
+                        checkWin();
+                    }
+                };
+            }
+        }
+
+        function checkWin() {
+            var tiles = board.querySelectorAll('.tile');
+            var won = true;
+            for (var i = 0; i < tiles.length; i++) {
+                var piece = parseInt(tiles[i].getAttribute('data-piece'), 10);
+                var id = parseInt(tiles[i].getAttribute('data-id'), 10);
+                if (piece !== id) { won = false; break; }
+            }
+
+            if (won) {
+                gameActive = false;
+                stopTimer();
+                for (var i = 0; i < tiles.length; i++) {
+                    tiles[i].style.cursor = 'default';
+                    tiles[i].style.outline = '3px solid #16c79a';
+                    tiles[i].style.outlineOffset = '-3px';
+                    tiles[i].style.boxShadow = '0 0 8px #16c79a';
+                    tiles[i].onclick = null;
+                }
+                setTimeout(function() {
+                    finalTimeEl.textContent = formatTime(seconds);
+                    finalMovesEl.textContent = moves;
+                    winModal.style.display = 'flex';
+                }, 400);
+            }
+        }
+
+        closeModalBtn.addEventListener('click', function() {
+            winModal.style.display = 'none';
+        });
+    })();
+    </script>
+</body>
+</html>
